@@ -11,8 +11,7 @@ public class FilePickerPlugin: NSObject, FlutterPlugin {
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult)
-  {
+  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "pickFiles":
       handleFileSelection(call, result: result)
@@ -31,98 +30,108 @@ public class FilePickerPlugin: NSObject, FlutterPlugin {
   private func handleFileSelection(
     _ call: FlutterMethodCall, result: @escaping FlutterResult
   ) {
-    let dialog = NSOpenPanel()
-    let args = call.arguments as! [String: Any]
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
 
-    dialog.directoryURL = URL(
-      fileURLWithPath: args["initialDirectory"] as? String ?? ""
-    )
-    dialog.showsHiddenFiles = false
-    let allowMultiple = args["allowMultiple"] as? Bool ?? false
-    dialog.allowsMultipleSelection = allowMultiple
-    dialog.canChooseDirectories = false
-    dialog.canChooseFiles = true
-    let extensions = args["allowedExtensions"] as? [String] ?? []
-    applyExtensions(dialog, extensions)
+      let dialog = NSOpenPanel()
+      let args = call.arguments as! [String: Any]
 
-    if dialog.runModal() == NSApplication.ModalResponse.OK {
-      if allowMultiple {
-        let pathResult = dialog.urls
-        if pathResult.isEmpty {
-          result(nil)
+      dialog.directoryURL = URL(
+        fileURLWithPath: args["initialDirectory"] as? String ?? ""
+      )
+      dialog.showsHiddenFiles = false
+      let allowMultiple = args["allowMultiple"] as? Bool ?? false
+      dialog.allowsMultipleSelection = allowMultiple
+      dialog.canChooseDirectories = false
+      dialog.canChooseFiles = true
+      let extensions = args["allowedExtensions"] as? [String] ?? []
+      applyExtensions(dialog, extensions)
+
+      if dialog.runModal() == NSApplication.ModalResponse.OK {
+        if allowMultiple {
+          let pathResult = dialog.urls
+          if pathResult.isEmpty {
+            result(nil)
+          } else {
+            let paths = pathResult.map { $0.path }
+            result(paths)
+          }
         } else {
-          let paths = pathResult.map { $0.path }
-          result(paths)
+          let pathResult = dialog.url
+          if pathResult == nil {
+            result(nil)
+          } else {
+            result([pathResult!.path])
+          }
         }
+        return
       } else {
-        let pathResult = dialog.url
-        if pathResult == nil {
-          result(nil)
-        } else {
-          result([pathResult!.path])
-        }
+        // User dismissed the dialog
+        result(nil)
+        return
       }
-      return
-    } else {
-      // User dismissed the dialog
-      result(nil)
-      return
     }
   }
 
   private func handleDirectorySelection(
     _ call: FlutterMethodCall, result: @escaping FlutterResult
   ) {
-    let dialog = NSOpenPanel()
-    let args = call.arguments as! [String: Any]
+    DispatchQueue.main.async {
+      let dialog = NSOpenPanel()
+      let args = call.arguments as! [String: Any]
 
-    dialog.directoryURL = URL(
-      fileURLWithPath: args["initialDirectory"] as? String ?? ""
-    )
-    dialog.showsHiddenFiles = false
-    dialog.allowsMultipleSelection = false
-    dialog.canChooseDirectories = true
-    dialog.canChooseFiles = false
+      dialog.directoryURL = URL(
+        fileURLWithPath: args["initialDirectory"] as? String ?? ""
+      )
+      dialog.showsHiddenFiles = false
+      dialog.allowsMultipleSelection = false
+      dialog.canChooseDirectories = true
+      dialog.canChooseFiles = false
 
-    if dialog.runModal() == NSApplication.ModalResponse.OK {
-      if let url = dialog.url {
-        result(url.path)
-        return
+      if dialog.runModal() == NSApplication.ModalResponse.OK {
+        if let url = dialog.url {
+          result(url.path)
+          return
+        }
       }
+      // User dismissed the dialog
+      result(nil)
     }
-    // User dismissed the dialog
-    result(nil)
   }
 
   private func handleSaveFile(
     _ call: FlutterMethodCall, result: @escaping FlutterResult
   ) {
-    let dialog = NSSavePanel()
-    let args = call.arguments as! [String: Any]
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
 
-    dialog.title = args["dialogTitle"] as? String ?? ""
-    dialog.showsTagField = false
-    dialog.showsHiddenFiles = false
-    dialog.canCreateDirectories = true
-    dialog.nameFieldStringValue = args["fileName"] as? String ?? ""
+      let dialog = NSSavePanel()
+      let args = call.arguments as! [String: Any]
 
-    if let initialDirectory = args["initialDirectory"] as? String,
-      !initialDirectory.isEmpty
-    {
-      dialog.directoryURL = URL(fileURLWithPath: initialDirectory)
-    }
+      dialog.title = args["dialogTitle"] as? String ?? ""
+      dialog.showsTagField = false
+      dialog.showsHiddenFiles = false
+      dialog.canCreateDirectories = true
+      dialog.nameFieldStringValue = args["fileName"] as? String ?? ""
 
-    let extensions = args["allowedExtensions"] as? [String] ?? []
-    applyExtensions(dialog, extensions)
-
-    if dialog.runModal() == NSApplication.ModalResponse.OK {
-      if let url = dialog.url {
-        result(url.path)
-        return
+      if let initialDirectory = args["initialDirectory"] as? String,
+        !initialDirectory.isEmpty
+      {
+        dialog.directoryURL = URL(fileURLWithPath: initialDirectory)
       }
+
+      let extensions = args["allowedExtensions"] as? [String] ?? []
+      applyExtensions(dialog, extensions)
+
+      if dialog.runModal() == NSApplication.ModalResponse.OK {
+        if let url = dialog.url {
+          result(url.path)
+          return
+        }
+      }
+      // User dismissed the dialog
+      result(nil)
     }
-    // User dismissed the dialog
-    result(nil)
   }
 
   /// Applies extensions to dialog using appropriate API
